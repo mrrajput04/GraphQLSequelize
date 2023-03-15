@@ -1,5 +1,6 @@
 const Sequelize = require("sequelize");
 const sequelize = require("../db");
+const { Address } = require("./addressModel");
 
 const tableName = 'Users';
 
@@ -27,6 +28,7 @@ const User = sequelize.define("User", {
     primaryKey: true,
     unique: true,
   },
+  address: [Address],
   password: {
     type: Sequelize.STRING,
     allowNull: false,

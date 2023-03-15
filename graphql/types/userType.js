@@ -1,4 +1,5 @@
 const { GraphQLObjectType, GraphQLInt, GraphQLString } = require("graphql");
+const {Address} = require('../../models')
 
 const UserType = new GraphQLObjectType({
   name: "User",
@@ -24,9 +25,12 @@ const UserType = new GraphQLObjectType({
       type: GraphQLString,
       resolve: (user) => user.lastName,
     },
-    password:{
-        type:GraphQLString,
-        resolve:(user)=>user.password
+    password: {
+      type: GraphQLString,
+      resolve: (user) => user.password,
+    },
+    address:{
+      type:[Address]
     },
     createdAt: {
       type: GraphQLString,

@@ -2,49 +2,40 @@ const express = require("express");
 const { graphqlHTTP } = require("express-graphql");
 const { buildSchema } = require("graphql");
 const { PORT } = require("./config");
-const userMutations = require('./graphql/mutations/userMutation');
-const userQuery = require('./graphql/queries/userQuery');
-const {GraphQLObjectType, GraphQLSchema} = require('graphql');
+const {userMutations,addressMutations} = require("./graphql/mutations");
+const userQuery = require("./graphql/queries/userQuery");
+const { GraphQLObjectType, GraphQLSchema } = require("graphql");
+const cors = require("cors");
 // const pg = require("pg");
 require("./db");
 
-// const schema = buildSchema(`
-// type Query {
-//     message: String
-// }
-// `);
-
-// const root = {
-//   message: () => "Hello World!",
-// };
-
-
 const Query = new GraphQLObjectType({
-  name: 'Query',
+  name: "Query",
   fields: {
-      ...userQuery
-  }
-})
+    ...userQuery,
+  },
+});
 
 const Mutation = new GraphQLObjectType({
   name: "Mutation",
   fields: () => ({
-      ...userMutations
-  })
-})
-
-
+    ...userMutations,
+    ...addressMutations
+  }),
+});
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 app.use(
   "/graphql",
+
   graphqlHTTP({
     graphiql: true,
     schema: new GraphQLSchema({
-        query: Query,
-        mutation: Mutation
-    })
-})
+      query: Query,
+      mutation: Mutation,
+    }),
+  })
 );
 app.listen(PORT, () => console.log(`server running on port ${PORT}`));
