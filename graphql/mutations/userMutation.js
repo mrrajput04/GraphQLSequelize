@@ -3,8 +3,11 @@ const { UserType } = require("../types/userType");
 const { User } = require("../../models/userModel");
 const { UserInputType } = require("../inputTypes/UserInputTypes");
 const { GraphQLNonNull, GraphQLString, GraphQLInt } = require("graphql");
+const otpGenerator = require('otp-generator')
 const bcrypt = require("bcrypt");
-
+// const {SECRET_KEY} = require('../../config')
+//   const jwt = require('jsonwebtoken')
+const JwtService = require('../../services/jwtService')
 const registerUser = {
   type: UserType,
   args: {
@@ -15,6 +18,7 @@ const registerUser = {
     email: { type: GraphQLNonNull(GraphQLString) },
     password: { type: GraphQLString },
     confirm_password: { type: GraphQLString },
+    
   },
   resolve: async (parent, args, context, info) => {
     const { email, firstName, lastName, username, password, confirm_password } =
@@ -36,6 +40,8 @@ const registerUser = {
       throw new Error("password should be minimum 6 characters");
     args.password = bcrypt.hashSync(args.password, 10);
     const user = await User.create(args);
+    access_token = JwtService.sign({ _id: user.id });
+    console.log(access_token)
     return user;
   },
 };
@@ -48,10 +54,18 @@ const ForgetPassword = {
     email: { type: GraphQLNonNull(GraphQLString) },
   },
   resolve: async (parent, args, context, info) => {
+    
     const {email} = args;
-    const data = await User.findOne({ where: { email } });
-    console.log(data,'=>')
-    return data;
+    const user = await User.findOne({ where: { email } });
+    if(!user)
+    throw new Error('invalid email')
+    const otp = otpGenerator.generate(6, {
+      upperCaseAlphabets: false,
+      specialChars: false,
+      lowerCaseAlphabets: false,
+    });
+    console.log(otp)
+    return user;
 }
 }
 

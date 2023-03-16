@@ -6,6 +6,7 @@ const {userMutations,addressMutations} = require("./graphql/mutations");
 const userQuery = require("./graphql/queries/userQuery");
 const { GraphQLObjectType, GraphQLSchema } = require("graphql");
 const cors = require("cors");
+const passport = require('passport')
 // const pg = require("pg");
 require("./db");
 
@@ -20,12 +21,13 @@ const Mutation = new GraphQLObjectType({
   name: "Mutation",
   fields: () => ({
     ...userMutations,
-    ...addressMutations
+    // ...addressMutations
   }),
 });
 
 const app = express();
 app.use(cors());
+app.use(passport.initialize());
 app.use(express.json());
 app.use(
   "/graphql",

@@ -4,7 +4,8 @@ const {
   } = require('graphql');
   const bcrypt = require('bcrypt');
   const {SECRET_KEY} = require('../../config')
-  const jwt = require('jsonwebtoken')
+  const jwt = require('jsonwebtoken');
+  const {jwtAuth} = require('../../services/passportJwt')
   
   const { UserType } = require('../types/userType');
   const { User } = require('../../models/userModel');
@@ -22,7 +23,7 @@ const {
      return user
     }
   };
-
+  
 
   const userLogin = {
     type: UserType,
@@ -37,7 +38,9 @@ const {
     }
   },
   resolve: async (parent, args, context, info) => {
-    console.log(args)
+    
+    const tok = context.rawHeaders[1].split(" ")[1];
+    jwtAuth(tok);
       const {username,password} = args;
       const user = await User.findOne({ where: { username } })
       if(!user)
@@ -48,6 +51,7 @@ const {
      const token = jwt.sign({ user_id:  username }, SECRET_KEY, {
       expiresIn: "2h",
     })
+    
     return user; 
     } 
   }
