@@ -1,13 +1,15 @@
 const merge = require("lodash.merge");
 const { UserType } = require("../types/userType");
-const { User } = require("../../models/userModel");
+const { User, Otp } = require("../../models");
 const { UserInputType } = require("../inputTypes/UserInputTypes");
 const { GraphQLNonNull, GraphQLString, GraphQLInt } = require("graphql");
 const otpGenerator = require('otp-generator')
+const {otpEmail} = require('../../services/otpVerify')
 const bcrypt = require("bcrypt");
-// const {SECRET_KEY} = require('../../config')
-//   const jwt = require('jsonwebtoken')
-const JwtService = require('../../services/jwtService')
+const {SECRET_KEY} = require('../../config')
+  const jwt = require('jsonwebtoken');
+const JwtService = require('../../services/jwtService');
+
 const registerUser = {
   type: UserType,
   args: {
@@ -21,7 +23,7 @@ const registerUser = {
     
   },
   resolve: async (parent, args, context, info) => {
-    const { email, firstName, lastName, username, password, confirm_password } =
+    const { email, firstName,  username, password, confirm_password } =
       args;
     const data = await User.findOne({ where: { email } });
     if (data) throw new Error("email already exists");
@@ -40,7 +42,7 @@ const registerUser = {
       throw new Error("password should be minimum 6 characters");
     args.password = bcrypt.hashSync(args.password, 10);
     const user = await User.create(args);
-    access_token = JwtService.sign({ _id: user.id });
+   const  access_token = JwtService.sign({ _id: user.id });
     console.log(access_token)
     return user;
   },
@@ -64,9 +66,52 @@ const ForgetPassword = {
       specialChars: false,
       lowerCaseAlphabets: false,
     });
-    console.log(otp)
+
+    const   hashedOtp =  await bcrypt.hash(otp, 10);
+    const emailExists = await Otp.findOne({ email });    
+    if(emailExists){
+      const updateOtp = await Otp.update(
+        { otp: hashedOtp },
+        { where: { email: email } }
+      )
+    }else{
+      const otpSave = new Otp({ otp:hashedOtp, email });
+    await otpSave.save();
+    }
+    otpEmail(otp, email);
     return user;
 }
+}
+
+const otpVerification = {
+  type: UserType,
+  args: {
+    email: { type: GraphQLNonNull(GraphQLString) },
+    otp:{ type: GraphQLNonNull(GraphQLString) },
+  },
+  resolve: async(parent,args)=>{
+    const {otp,email} = args
+    const user = await User.findOne({ where: { email } });
+    if(!user)
+    throw new Error('invalid email')
+    const userExist = await Otp.findOne({ email });
+    console.log(userExist)
+   const otpVerify = await bcrypt.compare(otp, userExist.otp)
+    if (!otpVerify) {
+      throw new Error('invalid otp')
+    }
+    const token = jwt.sign({ user_id: user._id }, SECRET_KEY, {
+      expiresIn: "2h",
+    });
+    return user;
+  }
+}
+
+const createNewPassword = {
+  // const auth = req.headers["authorization"];
+  // if (!auth)
+    // return next(CustomErrorHandler.unAuthorized("unauthorized access"));
+  // const token = auth.split(" ")[1];
 }
 
 
@@ -124,5 +169,6 @@ module.exports = {
   updateUser,
   deleteUser,
   registerUser,
-  ForgetPassword
+  ForgetPassword,
+  otpVerification
 };
