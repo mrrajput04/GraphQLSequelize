@@ -1,13 +1,15 @@
 const merge = require("lodash.merge");
 const { UserType } = require("../types/userType");
-const { User } = require("../../models/userModel");
+const { User, Otp } = require("../../models");
 const { UserInputType } = require("../inputTypes/UserInputTypes");
 const { GraphQLNonNull, GraphQLString, GraphQLInt } = require("graphql");
-const otpGenerator = require('otp-generator')
+const otpGenerator = require("otp-generator");
+const { otpEmail } = require("../../services/otpVerify");
 const bcrypt = require("bcrypt");
-// const {SECRET_KEY} = require('../../config')
-//   const jwt = require('jsonwebtoken')
-const JwtService = require('../../services/jwtService')
+const { SECRET_KEY } = require("../../config");
+const jwt = require("jsonwebtoken");
+const JwtService = require("../../services/jwtService");
+
 const registerUser = {
   type: UserType,
   args: {
@@ -18,11 +20,9 @@ const registerUser = {
     email: { type: GraphQLNonNull(GraphQLString) },
     password: { type: GraphQLString },
     confirm_password: { type: GraphQLString },
-    
   },
   resolve: async (parent, args, context, info) => {
-    const { email, firstName, lastName, username, password, confirm_password } =
-      args;
+    const { email, firstName, username, password, confirm_password } = args;
     const data = await User.findOne({ where: { email } });
     if (data) throw new Error("email already exists");
     const userName = await User.findOne({ where: { username } });
@@ -40,13 +40,11 @@ const registerUser = {
       throw new Error("password should be minimum 6 characters");
     args.password = bcrypt.hashSync(args.password, 10);
     const user = await User.create(args);
-    access_token = JwtService.sign({ _id: user.id });
-    console.log(access_token)
+    const access_token = JwtService.sign({ _id: user.id });
+    console.log(access_token);
     return user;
   },
 };
-
-
 
 const ForgetPassword = {
   type: UserType,
@@ -54,21 +52,59 @@ const ForgetPassword = {
     email: { type: GraphQLNonNull(GraphQLString) },
   },
   resolve: async (parent, args, context, info) => {
-    
-    const {email} = args;
+    const { email } = args;
     const user = await User.findOne({ where: { email } });
-    if(!user)
-    throw new Error('invalid email')
+    if (!user) throw new Error("invalid email");
     const otp = otpGenerator.generate(6, {
       upperCaseAlphabets: false,
       specialChars: false,
       lowerCaseAlphabets: false,
     });
-    console.log(otp)
-    return user;
-}
-}
 
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const emailExists = await Otp.findOne({ email });
+    if (emailExists) {
+      const updateOtp = await Otp.update(
+        { otp: hashedOtp },
+        { where: { email: email } }
+      );
+    } else {
+      const otpSave = new Otp({ otp: hashedOtp, email });
+      await otpSave.save();
+    }
+    otpEmail(otp, email);
+    return user;
+  },
+};
+
+const otpVerification = {
+  type: UserType,
+  args: {
+    email: { type: GraphQLNonNull(GraphQLString) },
+    otp: { type: GraphQLNonNull(GraphQLString) },
+    password: { type: GraphQLNonNull(GraphQLString) },
+    confirm_password: { type: GraphQLNonNull(GraphQLString) },
+  },
+  resolve: async (parent, args) => {
+    const { otp, email, password, confirm_password } = args;
+    const user = await User.findOne({ where: { email } });
+    if (!user) throw new Error("invalid email");
+    const userExist = await Otp.findOne({ email });
+    const otpVerify = await bcrypt.compare(otp, userExist.otp);
+    if (!otpVerify) {
+      throw new Error("invalid otp");
+    }
+    if (password !== confirm_password)
+      throw new Error("password and confirm password does not match");
+    const hashedPassword = bcrypt.hashSync(password, 10);
+     await User.update(
+      { password: hashedPassword },
+      { where: { email: email } }
+    );
+
+    return user;
+  },
+};
 
 const updateUser = {
   type: UserType,
@@ -124,5 +160,6 @@ module.exports = {
   updateUser,
   deleteUser,
   registerUser,
-  ForgetPassword
+  ForgetPassword,
+  otpVerification,
 };

@@ -2,12 +2,16 @@ const express = require("express");
 const { graphqlHTTP } = require("express-graphql");
 const { buildSchema } = require("graphql");
 const { PORT } = require("./config");
-const {userMutations,addressMutations} = require("./graphql/mutations");
+const { userMutations, addressMutations } = require("./graphql/mutations");
 const userQuery = require("./graphql/queries/userQuery");
-const { GraphQLObjectType, GraphQLSchema } = require("graphql");
+const { GraphQLObjectType, GraphQLSchema, GraphQLBoolean } = require("graphql");
 const cors = require("cors");
-const passport = require('passport')
-// const pg = require("pg");
+const passport = require("passport");
+const ImageUpload = require("./graphql/mutations/fileUpload");
+const { GraphQLUpload } = require("graphql-upload");
+const { createReadStream } = require("fs");
+const { fileType } = require("./graphql/types/fileType");
+
 require("./db");
 
 const Query = new GraphQLObjectType({
@@ -17,12 +21,30 @@ const Query = new GraphQLObjectType({
   },
 });
 
+
 const Mutation = new GraphQLObjectType({
   name: "Mutation",
-  fields: () => ({
+  type:fileType,
+  fields: {
     ...userMutations,
-    // ...addressMutations
-  }),
+    uploadImage: {
+      description: "Uploads an image.",
+      type: GraphQLBoolean,
+      args: {
+        image: {
+          description: "Image file.",
+          type: GraphQLUpload,
+        },
+      },
+      
+      async resolve(parent, { image }) {
+        const { filename, mimetype, createReadStream } = await image;
+        const stream = createReadStream();
+        // Promisify the stream and store the file, then…
+        return true;
+      },
+    },
+  },
 });
 
 const app = express();
